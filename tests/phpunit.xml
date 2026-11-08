@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	SPDX-FileCopyrightText: 2026 Leiterrunde
+	SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<phpunit bootstrap="bootstrap.php" colors="true">
+	<testsuites>
+		<testsuite name="unit">
+			<directory>unit</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

@@ -1,0 +1,13 @@
+Third-party attributions
+========================
+
+Icons
+-----
+The application icon (img/*.svg) and the icon path data bundled in
+leiterrunde/js/lr-common.mjs are derived from Material Design Icons
+(https://materialdesignicons.com), Copyright (c) Google and
+contributors, licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Everything else in this repository is original work licensed under
+AGPL-3.0-or-later (see LICENSE).

@@ -11,9 +11,9 @@
 	<summary>Duty planning for altar servers</summary>
 	<summary lang="de">Dienstplan für Messdiener</summary>
 	<description><![CDATA[Altar server plan module of the Leiterrunde suite – requires the Leiterrunde app. Services at multiple church locations with availability polls and smart assignment.]]></description>
+	<version>0.0.1</version>
 	<licence>agpl</licence>
 	<author>Leiterrunde</author>
-	<version>0.0.1</version>
 	<namespace>LeiterrundeMessdienerplan</namespace>
 	<category>organization</category>
 	<bugs>https://github.com/ollimaz/leiterrunde_messdienerplan/issues</bugs>
@@ -29,3 +29,4 @@
 		</navigation>
 	</navigations>
 </info>
+

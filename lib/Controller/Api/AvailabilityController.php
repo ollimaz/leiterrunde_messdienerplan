@@ -63,7 +63,11 @@ class AvailabilityController extends ApiController {
 			}
 			$persons = [];
 			foreach ($this->inviteMapper->findForPeriod($period_id) as $i) {
-				$persons[] = ['id' => $i->getPersonId(), 'name' => $this->personName($i->getPersonId())];
+				$p = $this->personMapper->find($i->getPersonId());
+				$values = json_decode($p->getCustomFields() ?? '{}', true) ?: [];
+				$persons[] = ['id' => $p->getId(), 'name' => $this->personName($p->getId()),
+					'first_name' => $p->getFirstName(), 'last_name' => $p->getLastName(),
+					'default_location_id' => $values['messdiener_location'] ?? null];
 			}
 			$locations = [];
 			foreach ($this->locationMapper->findAll() as $l) {

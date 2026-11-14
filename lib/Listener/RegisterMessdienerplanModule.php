@@ -15,7 +15,7 @@ use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 
 class RegisterMessdienerplanModule implements IEventListener {
-	public function __construct(private MessdienerplanModule $module) {
+	public function __construct(private MessdienerplanModule $module, private \OCA\LeiterrundeMessdienerplan\Service\PersonFieldsProvider $personFields) {
 	}
 
 	public function handle(Event $event): void {
@@ -23,5 +23,6 @@ class RegisterMessdienerplanModule implements IEventListener {
 			return;
 		}
 		$event->registerModule($this->module);
+		$event->registerProvider(\OCA\Leiterrunde\Module\IPersonFieldsProvider::class, $this->personFields);
 	}
 }

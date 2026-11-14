@@ -15,18 +15,30 @@ const NAV = [
 	{ route: '#/orte', label: _t('Locations'), cap: 'messdiener.manage', icon: 'list' },
 ];
 
+let selectedLocation = '';
+async function locationSelect(api, onChange) {
+	const locations = await api('/locations');
+	if (!locations.some(l => String(l.id) === selectedLocation)) selectedLocation = '';
+	return h('select', { 'aria-label': _t('Location'), onchange: e => { selectedLocation = e.target.value; onChange(); } },
+		h('option', { value: '' }, _t('All locations')),
+		...locations.map(l => h('option', { value: l.id, selected: String(l.id) === selectedLocation }, l.name)));
+}
+
 let periodsCache = null;
 async function periods(api, fresh = false) {
 	if (periodsCache === null || fresh) periodsCache = await api('/periods');
 	return periodsCache;
 }
 
+let selectedPeriod = null;
 function periodSelect(api, current, onChange) {
-	const sel = h('select', { onchange: (e) => onChange(+e.target.value) });
+	current = current || selectedPeriod;
+	const change = id => { selectedPeriod = id; onChange(id); };
+	const sel = h('select', { onchange: (e) => change(+e.target.value) });
 	periods(api).then(list => {
 		put(sel, ...list.map(p => h('option', { value: p.id, selected: p.id === current ? '' : null },
 			p.title + (p.status === 'closed' ? ' (' + _t('closed') + ')' : ''))));
-		if (!current && list.length) onChange(list[0].id);
+		if (list.length) change(list.some(p => p.id === current) ? current : list[0].id);
 	});
 	return sel;
 }
@@ -57,7 +69,7 @@ async function viewPlan(v, ME, { api }) {
 	const body = h('div', {});
 	const render = async () => {
 		if (!current) { put(body, emptyState(_t('No periods.'))); return; }
-		const services = await api('/services?period_id=' + current);
+		const services = (await api('/services?period_id=' + current)).filter(s => !selectedLocation || String(s.location_id) === selectedLocation);
 		put(body, services.length ? h('table', { class: 'lr-table' },
 			h('thead', {}, h('tr', {}, h('th', {}, _t('Date')), h('th', {}, _t('Time')), h('th', {}, _t('Service')), h('th', {}, _t('Location')), h('th', {}, _t('Assigned')), h('th', {}, _t('Fill')))),
 			h('tbody', {}, ...services.map(s => serviceRow(s, canManage))))
@@ -76,12 +88,10 @@ async function viewDienst(v, ME, { api, coreApi }) {
 	const body = h('div', {});
 	const reload = () => viewDienst(v, ME, { api, coreApi });
 
-	const [invites, persons] = await Promise.all([
-		canManage ? api('/periods/' + s.period_id + '/invites').catch(() => []) : [],
-		canManage ? coreApi('/persons/options').catch(() => []) : [],
-	]);
-	const invitedIds = new Set(invites.map(i => i.person_id));
-	const invitedPersons = persons.filter(p => invitedIds.has(p.id));
+	const matrix = canManage ? await api('/availability?period_id=' + s.period_id) : null;
+	const invitedPersons = (matrix?.persons || []).map(p => ({ ...p,
+		picker_sublabel: matrix.cells[s.id]?.[p.id] === 'yes' ? _t('Yes') : matrix.cells[s.id]?.[p.id] === 'no' ? _t('No') : _t('No answer'),
+	}));
 
 	const removeAssign = async (a) => {
 		if (!confirm(_t('Remove {name} from this service?', { name: a.person_name }))) return;
@@ -90,8 +100,20 @@ async function viewDienst(v, ME, { api, coreApi }) {
 	};
 
 	let pSel = null;
+	const pickerWrap = h('div', {});
+	const allPeople = h('input', { type: 'checkbox' });
+	const renderPicker = () => {
+		pSel = null;
+		const locationId = selectedLocation || String(s.location_id);
+		const assigned = new Set(s.assigned.map(a => a.person_id));
+		const candidates = invitedPersons.filter(p => !assigned.has(p.id) && (allPeople.checked || String(p.default_location_id) === locationId));
+		put(pickerWrap, personPicker({ persons: candidates, onChange: pid => { pSel = pid; } }));
+	};
+	allPeople.addEventListener('change', renderPicker);
+	if (canManage) renderPicker();
 	const assignForm = canManage ? h('div', { class: 'lr-form lr-formgrid' },
-		field(_t('Person'), personPicker({ persons: invitedPersons, onChange: (pid) => { pSel = pid; } }), 6),
+		field(_t('Person'), pickerWrap, 6),
+		field(_t('Show everyone'), allPeople, 6),
 		formActions(h('button', { class: 'lr-btn', onclick: async () => {
 			if (!pSel) { toast(_t('Please select a person')); return; }
 			try { await api('/services/' + s.id + '/assignments', { method: 'POST', json: { person_id: +pSel } }); reload(); }
@@ -314,23 +336,27 @@ async function viewMatrix(v, ME, { api }) {
 		};
 		put(body,
 			open ? null : h('p', { class: 'lr-muted' }, _t('Poll is closed – answers are read-only.')),
-			m.persons.length ? h('div', { style: 'overflow-x:auto' }, h('table', { class: 'lr-table' },
-				h('thead', {}, h('tr', {}, h('th', {}, _t('Service')), ...m.persons.map(p => h('th', {}, p.name)))),
-				h('tbody', {}, ...m.services.map(s => h('tr', {},
-					h('td', {}, formatDate(s.service_date) + ' ' + (s.start_time || '') + ' ' + s.title + (s.location_name ? ' (' + s.location_name + ')' : '')),
-					...m.persons.map(p => {
+			!m.persons.length ? emptyState(_t('Nobody invited yet.'))
+				: !m.services.length ? emptyState(_t('No services in this period.'))
+				: h('div', { class: 'lr-tablewrap' }, h('table', { class: 'lr-table lr-matrix' },
+				h('thead', {}, h('tr', {}, h('th', {}, _t('Person')), ...m.services.map(s => h('th', {},
+					formatDate(s.service_date) + ' ' + (s.start_time || ''),
+					h('div', { class: 'lr-muted lr-matrix-sub', title: s.title + (s.location_name ? ' (' + s.location_name + ')' : '') },
+						s.title + (s.location_name ? ' · ' + s.location_name : '')))))),
+				h('tbody', {}, ...m.persons.map(p => h('tr', {},
+					h('td', {}, p.name),
+					...m.services.map(s => {
 						const st = (m.cells[s.id] || {})[p.id];
-						const cell = h('td', { class: 'lr-actions' });
-						if (st === 'yes') cell.append(h('span', { class: 'lr-badge ok' }, _t('Yes')));
-						else if (st === 'no') cell.append(h('span', { class: 'lr-badge fail' }, _t('No')));
-						else cell.append(h('span', { class: 'lr-muted' }, '–'));
+						const inner = h('span', { class: 'lr-actions' });
+						if (st === 'yes') inner.append(h('span', { class: 'lr-badge ok' }, _t('Yes')));
+						else if (st === 'no') inner.append(h('span', { class: 'lr-badge fail' }, _t('No')));
+						else inner.append(h('span', { class: 'lr-muted' }, '–'));
 						if (open) {
-							cell.append(h('button', { class: 'lr-btn quiet', title: _t('Yes'), onclick: () => setCell(s, p, st === 'yes' ? null : 'yes') }, '✓'));
-							cell.append(h('button', { class: 'lr-btn quiet', title: _t('No'), onclick: () => setCell(s, p, st === 'no' ? null : 'no') }, '✗'));
+							inner.append(h('button', { class: 'lr-btn quiet', title: _t('Yes'), onclick: () => setCell(s, p, st === 'yes' ? null : 'yes') }, '✓'));
+							inner.append(h('button', { class: 'lr-btn quiet', title: _t('No'), onclick: () => setCell(s, p, st === 'no' ? null : 'no') }, '✗'));
 						}
-						return cell;
-					}))))))
-				: emptyState(_t('Nobody invited yet.')));
+						return h('td', {}, inner);
+					})))))));
 	};
 	put(v, lrPageHeader({ kicker: _t('Leiterrunde · Altar server plan'), title: _t('Availability'),
 		actions: [periodSelect(api, null, (id) => { current = id; render(); })] }), body);
@@ -412,6 +438,9 @@ mountApp({
 	appId: APP,
 	title: _t('Altar server plan'),
 	nav: NAV,
+	navigationHeader: async (ME, { api, refresh }) => ME.caps['messdiener.read'] || ME.caps['messdiener.manage']
+		? h('div', {}, h('label', { for: 'lr-location-filter', class: 'lr-flabel' }, _t('Location')),
+			Object.assign(await locationSelect(api, refresh), { id: 'lr-location-filter' })) : null,
 	routes: {
 		'#/plan': viewPlan,
 		'#/dienst': viewDienst,

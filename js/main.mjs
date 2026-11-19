@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Leiterrunde
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-const { mountApp, h, put, badge, toast, formatDate, lrPageHeader, field, formActions, emptyState, icon, personPicker } = window.LeiterrundeUI;
+const { mountApp, h, put, badge, toast, formatDate, lrPageHeader, field, formActions, emptyState, icon, personPicker, listView, persistForm, menuButton } = window.LeiterrundeUI;
 const { t: _t } = window.LeiterrundeUI.l10n('leiterrunde_messdienerplan');
 
 const APP = 'leiterrunde_messdienerplan';
@@ -70,11 +70,21 @@ async function viewPlan(v, ME, { api }) {
 	const render = async () => {
 		if (!current) { put(body, emptyState(_t('No periods.'))); return; }
 		const services = (await api('/services?period_id=' + current)).filter(s => !selectedLocation || String(s.location_id) === selectedLocation);
-		put(body, services.length ? h('table', { class: 'lr-table' },
-			h('thead', {}, h('tr', {}, h('th', {}, _t('Date')), h('th', {}, _t('Time')), h('th', {}, _t('Service')), h('th', {}, _t('Location')), h('th', {}, _t('Assigned')), h('th', {}, _t('Fill')))),
-			h('tbody', {}, ...services.map(s => serviceRow(s, canManage))))
-			: emptyState(_t('No services in this period.')));
+		const lv = planLv;
+		lv.setRows(services);
+		put(body, lv.el);
 	};
+	const planLv = listView({
+		scope: 'plan',
+		search: { placeholder: _t('Search services …'), text: s => [s.title, s.location_name].filter(Boolean).join(' ') },
+		sorts: [
+			{ key: 'date', label: _t('Date'), value: s => s.service_date || '' },
+			{ key: 'title', label: _t('Service'), value: s => s.title || '' },
+		],
+		headers: [_t('Date'), _t('Time'), _t('Service'), _t('Location'), _t('Assigned'), _t('Fill')],
+		row: (s) => serviceRow(s, canManage),
+		empty: _t('No services in this period.'),
+	});
 	put(v, lrPageHeader({ kicker: _t('Leiterrunde · Altar server plan'), title: _t('Plan'),
 		actions: [periodSelect(api, null, (id) => { current = id; render(); })] }), body);
 	await render();
@@ -263,9 +273,14 @@ async function viewVerwaltung(v, ME, { api, coreApi }) {
 					title: tI.value, period_id: period.id, location_id: +locSel.value, service_date: dI.value,
 					start_time: timeI.value || null, required: +reqI.value || 0, notes: notesI.value || null,
 					repeat: repeatSel.value, repeat_until: untilI.value || null } });
-				toast(_t('Created'), false); render();
+				serviceDraft.clear(); toast(_t('Created'), false); render();
 			} catch (e) { toast(e.message); }
 		} }, _t('Create'));
+		const serviceForm = h('div', { class: 'lr-form lr-formgrid' },
+			field(_t('Title'), tI, 4), field(_t('Location'), locSel, 4), field(_t('Date'), dI, 2), field(_t('Time'), timeI, 2),
+			field(_t('Required servers'), reqI, 2), field(_t('Repeat'), repeatSel, 3), field(_t('Repeat until'), untilI, 3), field(_t('Notes'), notesI, 4),
+			formActions(addService));
+		const serviceDraft = persistForm(serviceForm, APP + '.service-new');
 
 		/* invites */
 		let pSel = null;
@@ -289,14 +304,19 @@ async function viewVerwaltung(v, ME, { api, coreApi }) {
 					h('button', { class: 'lr-btn quiet', onclick: delPeriod }, _t('Delete')),
 				].filter(Boolean) }),
 			h('h3', {}, _t('Services')),
-			services.length ? h('table', { class: 'lr-table' },
-				h('thead', {}, h('tr', {}, h('th', {}, _t('Date')), h('th', {}, _t('Time')), h('th', {}, _t('Service')), h('th', {}, _t('Location')), h('th', {}, _t('Assigned')), h('th', {}, _t('Fill')))),
-				h('tbody', {}, ...services.map(s => serviceRow(s, true))))
-				: emptyState(_t('No services yet.')),
-			h('div', { class: 'lr-form lr-formgrid' },
-				field(_t('Title'), tI, 4), field(_t('Location'), locSel, 4), field(_t('Date'), dI, 2), field(_t('Time'), timeI, 2),
-				field(_t('Required servers'), reqI, 2), field(_t('Repeat'), repeatSel, 3), field(_t('Repeat until'), untilI, 3), field(_t('Notes'), notesI, 4),
-				formActions(addService)),
+			(() => {
+				const lv = listView({
+					scope: 'verwaltung-services',
+					search: { placeholder: _t('Search services …'), text: s => [s.title, s.location_name].filter(Boolean).join(' ') },
+					sorts: [{ key: 'date', label: _t('Date'), value: s => s.service_date || '' }],
+					headers: [_t('Date'), _t('Time'), _t('Service'), _t('Location'), _t('Assigned'), _t('Fill')],
+					row: (s) => serviceRow(s, true),
+					empty: _t('No services yet.'),
+				});
+				lv.setRows(services);
+				return lv.el;
+			})(),
+			serviceForm,
 			h('h3', {}, _t('Invited people')),
 			h('div', { class: 'lr-form lr-formgrid' },
 				field(_t('Person'), personPicker({ persons, onChange: (id) => { pSel = id; } }), 6), formActions(addInvite)),

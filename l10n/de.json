@@ -98,7 +98,8 @@
         "Yes": "Ja",
         "You are not invited to any period.": "Du bist zu keinem Zeitraum eingeladen.",
         "{n} assignments made": "{n} Einteilungen erstellt",
-        "{n} services understaffed": "{n} Dienste unterbesetzt"
+        "{n} services understaffed": "{n} Dienste unterbesetzt",
+        "Search services …": "Dienste suchen …"
     },
     "pluralForm": "nplurals=2; plural=(n != 1);"
 }

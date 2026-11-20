@@ -10,7 +10,17 @@
 	<name lang="de">Messdienerplan</name>
 	<summary>Duty planning for altar servers</summary>
 	<summary lang="de">Dienstplan für Messdiener</summary>
-	<description><![CDATA[Altar server plan module of the Leiterrunde suite – requires the Leiterrunde app. Services at multiple church locations with availability polls and smart assignment.]]></description>
+	<description><![CDATA[Altar server plan module of the Leiterrunde suite – requires the Leiterrunde app.
+
+Duty planning for altar servers:
+
+• Service catalog across multiple church locations
+• Planning periods with open/close workflow and invite tracking
+• Availability polls: servers submit when they can serve
+• Smart assignment suggestions with per-service assignments
+• Statistics on duties per server
+
+Requires the Leiterrunde app for persons, roles and permissions.]]></description>
 	<version>0.0.5</version>
 	<licence>agpl</licence>
 	<author>Leiterrunde</author>

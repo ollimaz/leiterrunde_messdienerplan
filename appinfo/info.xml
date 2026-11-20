@@ -21,7 +21,7 @@ Duty planning for altar servers:
 • Statistics on duties per server
 
 Requires the Leiterrunde app for persons, roles and permissions.]]></description>
-	<version>0.0.5</version>
+	<version>0.0.6</version>
 	<licence>agpl</licence>
 	<author>Leiterrunde</author>
 	<namespace>LeiterrundeMessdienerplan</namespace>
